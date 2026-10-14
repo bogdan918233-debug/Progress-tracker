@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сушка: Трекер Дефицита</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent: #38bdf8;
+            --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --border: #334155;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 16px;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: var(--text-main);
+        }
+
+        header p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .stat-box .label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .stat-box .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .time-travel-box {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.1) 0%, rgba(2, 132, 199, 0.05) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .time-travel-box .label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .time-travel-box .virtual-date {
+            font-size: 24px;
+            font-weight: 800;
+            color: #38bdf8;
+        }
+
+        .time-travel-box .subtext {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .progress-container {
+            margin-bottom: 12px;
+        }
+
+        .progress-bar-bg {
+            background-color: var(--border);
+            border-radius: 8px;
+            height: 10px;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .progress-bar-fill {
+            background: var(--accent-gradient);
+            height: 100%;
+            width: 0%;
+            transition: width 0.4s ease;
+        }
+
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: var(--bg-color);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text-main);
+            font-size: 14px;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            width: 100%;
+            background: var(--accent-gradient);
+            color: #0f172a;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn:active {
+            opacity: 0.85;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 200px;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border);
+        }
+
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: var(--bg-color);
+            color: var(--text-main);
+        }
+
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        .history-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Сушка: Цель 40к ккал</h1>
+        <p>Старт: 14 октября 2026</p>
+    </header>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('dashboard')">Обзор</div>
+        <div class="tab.active" class="tab" onclick="switchTab('input')">Ввод данных</div>
+        <div class="tab" onclick="switchTab('charts')">Графики</div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div id="dashboard-view" class="view-section active">
+        
+        <!-- Time Travel Card -->
+        <div class="time-travel-box">
+            <div class="label">Виртуальная дата (Путешествие во времени)</div>
+            <div class="virtual-date" id="virtual-date-display">14 октября 2026</div>
+            <div class="subtext" id="time-travel-subtext">Каждые 1 000 ккал дефицита = минус 2 дня</div>
+        </div>
+
+        <!-- Progress Card -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span style="font-size: 14px; font-weight: 600;">Общий дефицит</span>
+                <span id="deficit-text" style="font-size: 14px; font-weight: 700; color: var(--accent);">0 / 40 000 ккал</span>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-labels">
+                    <span id="percent-text">0% выполнено</span>
+                    <span>Цель: 40 000 ккал</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="label">Текущий вес</div>
+                <div class="value" id="current-weight-val">-- кг</div>
+            </div>
+            <div class="stat-box">
+                <div class="label">Средний дефицит/день</div>
+                <div class="value" id="avg-deficit-val">0 ккал</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- INPUT VIEW -->
+    <div id="input-view" class="view-section">
+        <div class="card">
+            <h3 style="font-size: 15px; margin-bottom: 12px;">Ежедневная отметка</h3>
+            
+            <div class="form-group">
+                <label>Дата</label>
+                <input type="date" id="log-date" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label>Вес (кг)</label>
+                <input type="number" step="0.1" id="log-weight" class="form-control" placeholder="Например: 82.5">
+            </div>
+
+            <div class="form-group">
+                <label>Потреблено калорий (ккал)</label>
+                <input type="number" id="log-consumed" class="form-control" placeholder="Например: 1800">
+            </div>
+
+            <div class="form-group">
+                <label>Сожжено калорий (расход / норма + тренировки)</label>
+                <input type="number" id="log-burned" class="form-control" placeholder="Например: 2800">
+            </div>
+
+            <button class="btn" onclick="saveLogData()">Сохранить данные</button>
+        </div>
+
+        <div class="card">
+            <h3 style="font-size: 15px; margin-bottom: 8px;">История записей</h3>
+            <div class="history-list" id="history-list">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS VIEW -->
+    <div id="charts-view" class="view-section">
+        <div class="card">
+            <h3 style="font-size: 15px; margin-bottom: 8px;">Динамика веса</h3>
+            <div class="chart-container">
+                <canvas id="weightChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="font-size: 15px; margin-bottom: 8px;">Калораж (Приход / Расход)</h3>
+            <div class="chart-container">
+                <canvas id="caloriesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Init Telegram WebApp if available
+        let tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+        }
+
+        // State Management
+        let appData = JSON.parse(localStorage.getItem('cutting_tracker_data')) || {
+            startDate: '2026-10-14',
+            logs: [] // { date, weight, consumed, burned, deficit }
+        };
+
+        // Set default date in input to today or last logged
+        document.getElementById('log-date').valueAsDate = new Date();
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            
+            if (tabId === 'dashboard') {
+                document.querySelectorAll('.tab')[0].classList.add('active');
+                document.getElementById('dashboard-view').classList.add('active');
+                updateDashboard();
+            } else if (tabId === 'input') {
+                document.querySelectorAll('.tab')[1].classList.add('active');
+                document.getElementById('input-view').classList.add('active');
+                renderHistory();
+            } else if (tabId === 'charts') {
+                document.querySelectorAll('.tab')[2].classList.add('active');
+                document.getElementById('charts-view').classList.add('active');
+                renderCharts();
+            }
+        }
+
+        function saveLogData() {
+            const date = document.getElementById('log-date').value;
+            const weight = parseFloat(document.getElementById('log-weight').value);
+            const consumed = parseFloat(document.getElementById('log-consumed').value);
+            const burned = parseFloat(document.getElementById('log-burned').value);
+
+            if (!date) {
+                alert('Пожалуйста, выберите дату');
+                return;
+            }
+
+            const deficit = (!isNaN(consumed) && !isNaN(burned)) ? (burned - consumed) : 0;
+
+            // Check if entry for this date exists, update or push
+            const existingIndex = appData.logs.findIndex(l => l.date === date);
+            const entry = { date, weight: isNaN(weight) ? null : weight, consumed: isNaN(consumed) ? null : consumed, burned: isNaN(burned) ? null : burned, deficit };
+
+            if (existingIndex >= 0) {
+                appData.logs[existingIndex] = entry;
+            } else {
+                appData.logs.push(entry);
+            }
+
+            // Sort logs by date
+            appData.logs.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            localStorage.setItem('cutting_tracker_data', JSON.stringify(appData));
+            alert('Данные сохранены!');
+            
+            // Clear inputs
+            document.getElementById('log-weight').value = '';
+            document.getElementById('log-consumed').value = '';
+            document.getElementById('log-burned').value = '';
+
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            let totalDeficit = appData.logs.reduce((sum, l) => sum + (l.deficit || 0), 0);
+            if (totalDeficit < 0) totalDeficit = 0;
+
+            const targetDeficit = 40000;
+            const percent = Math.min(100, (totalDeficit / targetDeficit) * 100).toFixed(1);
+
+            // Progress Bar & Text
+            document.getElementById('deficit-text').innerText = `${totalDeficit.toLocaleString()} / 40 000 ккал`;
+            document.getElementById('progress-fill').style.width = `${percent}%`;
+            document.getElementById('percent-text').innerText = `${percent}% выполнено`;
+
+            // Current weight
+            const validWeights = appData.logs.filter(l => l.weight !== null);
+            if (validWeights.length > 0) {
+                document.getElementById('current-weight-val').innerText = `${validWeights[validWeights.length - 1].weight} кг`;
+            } else {
+                document.getElementById('current-weight-val').innerText = '-- кг';
+            }
+
+            // Average deficit per day
+            const daysCount = appData.logs.length || 1;
+            const avgDef = Math.round(totalDeficit / daysCount);
+            document.getElementById('avg-deficit-val').innerText = `${avgDef} ккал`;
+
+            // Time Travel Calculation
+            // Rule: 1000 kcal deficit = 2 days back from start (14 Oct 2026)
+            // Or rather, start date + actual days passed - time travel days saved
+            const startDate = new Date(appData.startDate);
+            
+            // Total time travel days saved: every 1000 kcal = 2 days backward
+            const daysSaved = (totalDeficit / 1000) * 2;
+            
+            // Let's compute virtual date: Start Date + (Real days passed) - (Days saved)
+            // Alternatively, direct formula from start date: StartDate + TotalDaysOnDiet - DaysSaved
+            // Or simpler: virtual date is shifted backwards by `daysSaved` from "today" or from chronological progression.
+            // Let's compute actual calendar days elapsed since start:
+            const today = new Date();
+            const diffTime = Math.abs(today - startDate);
+            const realDaysPassed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            // Virtual timeline point = StartDate + realDaysPassed - daysSaved (clamped so it doesn't go before start)
+            let virtualDaysOffset = realDaysPassed - daysSaved;
+            if (virtualDaysOffset < 0) virtualDaysOffset = 0;
+
+            const virtualDate = new Date(startDate);
+            virtualDate.setDate(virtualDate.getDate() + Math.round(virtualDaysOffset));
+
+            const options = { day: 'numeric', month: 'long', year: 'numeric' };
+            document.getElementById('virtual-date-display').innerText = virtualDate.toLocaleDateString('ru-RU', options);
+        }
+
+        function renderHistory() {
+            const listEl = document.getElementById('history-list');
+            if (appData.logs.length === 0) {
+                listEl.innerHTML = '<div style="font-size: 13px; color: var(--text-muted); text-align: center; padding: 10px;">Нет записей</div>';
+                return;
+            }
+
+            listEl.innerHTML = appData.logs.slice().reverse().map(l => `
+                <div class="history-item">
+                    <span><strong>${l.date}</strong></span>
+                    <span>Вес: ${l.weight !== null ? l.weight + ' кг' : '—'}</span>
+                    <span>Дефицит: <strong style="color: ${l.deficit >= 0 ? 'var(--success)' : 'var(--danger)'}">${l.deficit} ккал</strong></span>
+                </div>
+            `).join('');
+        }
+
+        let weightChartInstance = null;
+        let caloriesChartInstance = null;
+
+        function renderCharts() {
+            const dates = appData.logs.map(l => l.date);
+            const weights = appData.logs.map(l => l.weight);
+            const consumedArr = appData.logs.map(l => l.consumed);
+            const burnedArr = appData.logs.map(l => l.burned);
+
+            // Weight Chart
+            const ctxWeight = document.getElementById('weightChart').getContext('2d');
+            if (weightChartInstance) weightChartInstance.destroy();
+            
+            weightChartInstance = new Chart(ctxWeight, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Вес (кг)',
+                        data: weights,
+                        borderColor: '#38bdf8',
+                        backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                        fill: true,
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+
+            // Calories Chart
+            const ctxCalories = document.getElementById('caloriesChart').getContext('2d');
+            if (caloriesChartInstance) caloriesChartInstance.destroy();
+
+            caloriesChartInstance = new Chart(ctxCalories, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: 'Потреблено',
+                            data: consumedArr,
+                            backgroundColor: '#ef4444',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Сожжено',
+                            data: burnedArr,
+                            backgroundColor: '#22c55e',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#f8fafc', font: { size: 11 } } } },
+                    scales: {
+                        x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        // Initial load
+        updateDashboard();
+    </script>
+</body>
+</html>
